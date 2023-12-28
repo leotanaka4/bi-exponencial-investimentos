@@ -1,7 +1,9 @@
 from dash import Dash, dcc, html, Input, Output, callback, ctx, dash_table
-import pandas as pd
-
 import dash_bootstrap_components as dbc
+
+import plotly.express as px
+
+import pandas as pd
 
 def formatar_numero(numero):
     if abs(numero) < 1000:
@@ -14,6 +16,8 @@ def formatar_numero(numero):
         return f'{numero / 1_000_000_000:.3g} bilhões'
 
 app = Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
+
+app.title = 'Exponencial Investimentos LTDA'
 
 # Carregando os DataFrames
 df_diversificador = pd.read_excel('../data/Bases de Dados.xlsx', sheet_name='Diversificador')
@@ -41,6 +45,45 @@ numero_de_clientes = df_renda_fixa['Cliente'].nunique()
 tabela_renda_fixa = df_renda_fixa[['Data de Vencimento', 'Ativo', 'Emissor', 'Quantidade', 'NET']].copy()
 tabela_renda_fixa['Data de Vencimento'] = df_renda_fixa['Data de Vencimento'].dt.strftime('%d/%m/%Y')
 tabela_renda_fixa['NET'] = df_renda_fixa['NET'].round(2).map('R$ {:.2f}'.format).str.replace('.', ',', regex=False)
+
+# Calcular o somatório de vencimentos por dia
+df_somatorio = df_renda_fixa.groupby('Data de Vencimento')['Quantidade'].sum().reset_index()
+
+# Criar gráfico de vencimentos ao longo do tempo
+fig_vencimentos = px.line(df_somatorio, x='Data de Vencimento', y='Quantidade', labels={'Quantidade': 'Quantidade de Vencimentos'}, template='plotly')
+
+# Adicionar título ao gráfico
+fig_vencimentos.update_layout(
+    title='Quantidade de Vencimentos por Dia',
+    font=dict(color='#000000'),  # Cor do texto
+)
+
+# Personalizar a cor da linha no gráfico de vencimentos
+fig_vencimentos.update_traces(line_color='#001F3F')
+
+# Criar gráfico boxplot de Quantidade
+fig_quantidades = px.box(df_renda_fixa, x='Quantidade', template='plotly')
+
+# Adicionar título ao gráfico
+fig_quantidades.update_layout(
+    title='Quantidade de Ativos',
+    font=dict(color='#000000'),  # Cor do texto
+)
+
+# Personalizar as cores do boxplot
+fig_quantidades.update_traces(marker=dict(color='#001F3F'), line=dict(color='#001F3F'))
+
+# Criar gráfico boxplot de NET
+fig_net = px.box(df_renda_fixa, x='NET', template='plotly')
+
+# Adicionar título ao gráfico
+fig_net.update_layout(
+    title='NET de Ativos',
+    font=dict(color='#000000'),  # Cor do texto
+)
+
+# Personalizar as cores do boxplot
+fig_net.update_traces(marker=dict(color='#001F3F'), line=dict(color='#001F3F'))
 
 button_style = {
     'backgroundColor': 'white',      # Fundo branco
@@ -84,6 +127,9 @@ div_style = {
     'backgroundColor': '#001F3F',   # Cor de fundo azul escuro
     'padding': '20px',               # Preenchimento interno
 }
+
+# Adicionar margens entre os gráficos
+margin_style = {'margin-top': '20px'}
 
 # Layout renda fixa
 layout_renda_fixa = [
@@ -168,7 +214,22 @@ layout_renda_fixa = [
                 'whiteSpace': 'normal',  # Permite que o texto quebre em várias linhas
             },
         ),
-    ])
+    ]),
+    dcc.Graph(
+        id='num-vencimentos',
+        figure=fig_vencimentos,
+        style=margin_style,
+    ),
+    dcc.Graph(
+        id='box-plot-quantidade',
+        figure=fig_quantidades,
+        style=margin_style,
+    ),
+    dcc.Graph(
+        id='box-plot-net',
+        figure=fig_net,
+        style=margin_style,
+    ),
 ]
 
 app.layout= html.Div(id="container_tela", children=layout_renda_fixa, style=div_style)
@@ -197,6 +258,9 @@ def menu_produtos(btn_coe, btn_carteira_automatizada, btn_renda_fixa, btn_oferta
     Output("receita_total", "children"),
     Output("numero_de_clientes", "children"),
     Output("tabela-renda-fixa", "data"),
+    Output("num-vencimentos", "figure"),
+    Output("box-plot-quantidade", "figure"),
+    Output("box-plot-net", "figure"),
     Input("assessores", "value"),
     Input("clientes", "value"),
     Input("sub_produtos", "value"),
@@ -221,7 +285,48 @@ def callback_kpis(nome_assessor, nome_cliente, nome_sub_produto):
     tabela_renda_fixa['Data de Vencimento'] = df_auxiliar['Data de Vencimento'].dt.strftime('%d/%m/%Y')
     tabela_renda_fixa['NET'] = df_auxiliar['NET'].round(2).map('R$ {:.2f}'.format).str.replace('.', ',', regex=False)
 
-    return formatar_numero(total_de_ativos), "R$ "+formatar_numero(renda_por_ativo), "R$ "+formatar_numero(receita_total), numero_de_clientes, tabela_renda_fixa.to_dict('records')
+    # Calcular o somatório de vencimentos por dia
+    df_somatorio = df_auxiliar.groupby('Data de Vencimento')['Quantidade'].sum().reset_index()
+
+    # Criar gráfico de vencimentos ao longo do tempo
+    fig_vencimentos = px.line(df_somatorio, x='Data de Vencimento', y='Quantidade', labels={'Quantidade': 'Quantidade de Vencimentos'}, template='plotly')
+
+    # Adicionar título ao gráfico
+    fig_vencimentos.update_layout(
+        title='Quantidade de Vencimentos por Dia',
+        font=dict(color='#000000'),  # Cor do texto
+    )
+
+    # Personalizar a cor da linha no gráfico de vencimentos
+    fig_vencimentos.update_traces(line_color='#001F3F')
+
+    # Criar gráfico boxplot de Quantidade
+    fig_quantidades = px.box(df_renda_fixa, x='Quantidade', template='plotly')
+
+    # Adicionar título ao gráfico
+    fig_quantidades.update_layout(
+        title='Quantidade de Ativos',
+        font=dict(color='#000000'),  # Cor do texto
+    )
+
+    # Personalizar as cores do boxplot
+    fig_quantidades.update_traces(marker=dict(color='#001F3F'), line=dict(color='#001F3F'))
+
+    # Criar gráfico boxplot de NET
+    fig_net = px.box(df_renda_fixa, x='NET', template='plotly')
+
+    # Adicionar título ao gráfico
+    fig_net.update_layout(
+        title='NET de Ativos',
+        font=dict(color='#000000'),  # Cor do texto
+    )
+
+    # Personalizar as cores do boxplot
+    fig_net.update_traces(marker=dict(color='#001F3F'), line=dict(color='#001F3F'))
+
+
+
+    return formatar_numero(total_de_ativos),"R$ "+formatar_numero(renda_por_ativo), "R$ "+formatar_numero(receita_total), numero_de_clientes, tabela_renda_fixa.to_dict('records'), fig_vencimentos, fig_quantidades, fig_net
 
 # Execute o aplicativo
 if __name__ == '__main__':
