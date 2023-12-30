@@ -21,6 +21,7 @@ app.title = 'Exponencial Investimentos LTDA'
 
 # Carregando os DataFrames
 df_coe = pd.read_excel('../data/Bases de Dados.xlsx', sheet_name='Relatório de COE')
+df_carteira_automatizada = pd.read_excel('../data/Bases de Dados.xlsx', sheet_name='Relatório de Carteiras Auto')
 df_diversificador = pd.read_excel('../data/Bases de Dados.xlsx', sheet_name='Diversificador')
 df_clientes = pd.read_excel('../data/Bases de Dados.xlsx', sheet_name='DadosClientes')
 df_assessores = pd.read_excel('../data/Bases de Dados.xlsx', sheet_name='DadosAssessor')
@@ -37,9 +38,27 @@ renda_por_ativo_coe = df_coe['Valor Aplicado'].sum()/len(df_coe)
 receita_total_coe = df_coe['Valor Aplicado'].sum()
 comissao_coe = df_coe['Valor Aplicado'].sum()*0.025
 
+# Fazendo a tabela para visualizar o COE
 tabela_coe = df_coe[['Data', 'Nome do Produto (30)', 'Tipo', 'Status', 'Valor Aplicado']].copy()
 tabela_coe['Data'] = df_coe['Data'].dt.strftime('%d/%m/%Y')
 tabela_coe['Valor Aplicado'] = df_coe['Valor Aplicado'].round(2).map('R$ {:.2f}'.format).str.replace('.', ',', regex=False)
+
+# Fazendo as alterações do DataFrame de Carteira Automatizada
+df_carteira_automatizada = pd.merge(df_carteira_automatizada, df_clientes, how='left', left_on='Cliente', right_on='Código Cliente')
+df_carteira_automatizada = df_carteira_automatizada.sort_values(by='Compra da carteira')
+df_carteira_automatizada.dropna(inplace=True)
+
+# Fazendo as métricas de Carteira Automatizada
+total_de_ativos_carteira_automatizada = len(df_carteira_automatizada)
+renda_por_ativo_carteira_automatizada = (df_carteira_automatizada['Posição Atual'].sum()-df_carteira_automatizada['Valor aportado'].sum())/len(df_carteira_automatizada)
+receita_total_carteira_automatizada = df_carteira_automatizada['Posição Atual'].sum()-df_carteira_automatizada['Valor aportado'].sum()
+comissao_carteira_automatizada = (df_carteira_automatizada['Posição Atual'].sum()-df_carteira_automatizada['Valor aportado'].sum())*0.012
+
+# Fazendo a tabela para visualizar as Carteiras Automatizadas
+tabela_carteira_automatizada = df_carteira_automatizada[['Compra da carteira', 'Valor aportado', 'Posição Atual', 'Rentabilidade']]
+tabela_carteira_automatizada['Valor aportado'] = df_carteira_automatizada['Valor aportado'].round(2).map('R$ {:.2f}'.format).str.replace('.', ',', regex=False)
+tabela_carteira_automatizada['Posição Atual'] = df_carteira_automatizada['Posição Atual'].round(2).map('R$ {:.2f}'.format).str.replace('.', ',', regex=False)
+tabela_carteira_automatizada['Rentabilidade'] = df_carteira_automatizada['Rentabilidade'].round(2).map('{:.2f} %'.format).str.replace('.', ',', regex=False)
 
 # Filtrando o DataFrame df_diversificador para 'Renda Fixa'
 df_renda_fixa = df_diversificador[df_diversificador['Produto'] == 'Renda Fixa']
@@ -220,6 +239,78 @@ layout_coe = [
     ]),
 ]
 
+# Layout Carteira Automatizada
+layout_carteira_automatizada = [
+    html.Div(children=[
+        html.Div(children=[
+            html.H1(children='Exponencial Investimentos LTDA', style={'textAlign': 'left', 'color': 'white', 'margin-left': '10px'}),
+        ], className='col-md-6'),
+
+        html.Div(children=[
+            html.Button('COE', id='btn_coe', n_clicks=0, style=button_style, className='button'),
+            html.Button('Carteira Automatizada', id='btn_carteira_automatizada', n_clicks=0, style=button_clicked_style, className='button'),
+            html.Button('Renda Fixa', id='btn_renda_fixa', n_clicks=0, style=button_style, className='button'),
+            html.Button('Oferta Pública', id='btn_oferta_publica', n_clicks=0, style=button_style, className='button'),
+        ], style={'display': 'flex', 'flex-wrap': 'wrap','textAlign': 'center', 'align-items': 'center', 'justify-content': 'space-evenly'}, className='col-md-6'),  
+    ], style={'margin-bottom': '40px'}, className='header row'),
+
+    html.Div(id='filtros', children=[
+        dcc.Dropdown(
+            options=[{'label': i, 'value': i} for i in ['Todos os clientes'] + sorted(df_carteira_automatizada['NomeCliente'].astype(str).unique().tolist())],
+            value='Todos os clientes',
+            id='clientes_carteira_automatizada',
+            className='dropdown',
+            style={'min-width': '220px', 'margin-bottom': '10px'}
+        ),
+    ], className='filter-container', style={'display': 'flex', 'flex-wrap': 'wrap','align-items': 'center', 'justify-content': 'space-evenly', 'margin-bottom': '30px'}),
+
+    html.Div(children=[
+        html.Div(children=[
+            html.H4(children='Total de Ativos', style={'textAlign': 'center', 'color': '#001F3F'}),
+            html.Div(id='total_de_ativos_carteira_automatizada', children=[formatar_numero(total_de_ativos_carteira_automatizada)], style={'textAlign': 'center', 'color': '#001F3F'}),
+        ], className='kpi-card', style=kpi_card_style),
+
+        html.Div(children=[
+            html.H4(children='Receita por Ativo', style={'textAlign': 'center', 'color': '#001F3F'}),
+            html.Div(id='renda_por_ativo_carteira_automatizada', children=["R$ "+formatar_numero(renda_por_ativo_carteira_automatizada)], style={'textAlign': 'center', 'color': '#001F3F'}),
+        ], className='kpi-card', style=kpi_card_style),
+
+        html.Div(children=[
+            html.H4(children='Receita Total', style={'textAlign': 'center', 'color': '#001F3F'}),
+            html.Div(id='receita_total_carteira_automatizada', children=["R$ "+formatar_numero(receita_total_carteira_automatizada)], style={'textAlign': 'center', 'color': '#001F3F'}),
+        ], className='kpi-card', style=kpi_card_style),
+
+        html.Div(children=[
+            html.H4(children='Comissão', style={'textAlign': 'center', 'color': '#001F3F'}),
+            html.Div(id='comissao_carteira_automatizada', children=["R$ "+formatar_numero(comissao_carteira_automatizada)], style={'textAlign': 'center', 'color': '#001F3F'}),
+        ], className='kpi-card', style=kpi_card_style),
+    ], style={'display': 'flex', 'flex-wrap': 'wrap', 'align-items': 'center', 'justify-content': 'space-evenly', 'margin-bottom': '40px'},
+       className='kpi-container'),
+
+    html.Div([
+        html.H2(children='Ativos', style={'textAlign': 'left', 'color': 'white', 'margin-left': '10px'}),
+        dash_table.DataTable(
+            id='tabela-carteira_automatizada',
+            columns=[{"name": i, "id": i} for i in tabela_carteira_automatizada.columns],
+            data=tabela_carteira_automatizada.to_dict('records'),
+            style_table={
+                'height': '300px',
+                'overflowY': 'auto',
+                'border': 'thin lightgrey solid',  # Adiciona borda à tabela
+            },
+            style_header={'backgroundColor': '#001F3F', 'color': 'white', 'fontWeight': 'bold'},  # Estilo do cabeçalho
+            style_cell={
+                'backgroundColor': '#f4f4f4',  # Cor de fundo das células
+                'color': '#001F3F',  # Cor do texto nas células
+                'textAlign': 'left',  # Alinhamento do texto
+                'font_size': '14px',  # Tamanho da fonte
+                'padding': '10px',  # Preenchimento interno
+                'whiteSpace': 'normal',  # Permite que o texto quebre em várias linhas
+            },
+        ),
+    ]),
+]
+
 # Layout renda fixa
 layout_renda_fixa = [
      html.Div(children=[
@@ -334,7 +425,7 @@ def menu_produtos(btn_coe, btn_carteira_automatizada, btn_renda_fixa, btn_oferta
     if 'btn_coe' == ctx.triggered_id:
         return layout_coe
     elif 'btn_carteira_automatizada' == ctx.triggered_id:
-        return layout_renda_fixa
+        return layout_carteira_automatizada
     elif 'btn_renda_fixa' == ctx.triggered_id:
         return layout_renda_fixa
     elif 'btn_oferta_publica' == ctx.triggered_id:
@@ -366,6 +457,34 @@ def callback_kpis_coe(nome_cliente):
     tabela_renda_fixa['NET'] = df_auxiliar['NET'].round(2).map('R$ {:.2f}'.format).str.replace('.', ',', regex=False)
 
     return formatar_numero(total_de_ativos_coe),"R$ "+formatar_numero(renda_por_ativo_coe), "R$ "+formatar_numero(receita_total_coe), "R$ "+formatar_numero(comissao_coe), tabela_coe.to_dict('records')
+
+@callback(
+    Output("total_de_ativos_carteira_automatizada", "children"),
+    Output("renda_por_ativo_carteira_automatizada", "children"),
+    Output("receita_total_carteira_automatizada", "children"),
+    Output("comissao_carteira_automatizada", "children"),
+    Output("tabela-carteira_automatizada", "data"),
+    Input("clientes_carteira_automatizada", "value"),
+    )
+def callback_kpis_carteira_automatizada(nome_cliente):
+    df_auxiliar = df_carteira_automatizada.copy()
+
+    if nome_cliente != "Todos os clientes":
+        df_auxiliar = df_auxiliar.loc[df_auxiliar['NomeCliente']==nome_cliente,:]
+
+    # Fazendo as métricas de Carteira Automatizada
+    total_de_ativos_carteira_automatizada = len(df_auxiliar)
+    renda_por_ativo_carteira_automatizada = (df_auxiliar['Posição Atual'].sum()-df_auxiliar['Valor aportado'].sum())/len(df_auxiliar)
+    receita_total_carteira_automatizada = df_auxiliar['Posição Atual'].sum()-df_auxiliar['Valor aportado'].sum()
+    comissao_carteira_automatizada = (df_auxiliar['Posição Atual'].sum()-df_auxiliar['Valor aportado'].sum())*0.012
+
+    # Fazendo a tabela para visualizar as Carteiras Automatizadas
+    tabela_carteira_automatizada = df_auxiliar[['Compra da carteira', 'Valor aportado', 'Posição Atual', 'Rentabilidade']]
+    tabela_carteira_automatizada['Valor aportado'] = df_auxiliar['Valor aportado'].round(2).map('R$ {:.2f}'.format).str.replace('.', ',', regex=False)
+    tabela_carteira_automatizada['Posição Atual'] = df_auxiliar['Posição Atual'].round(2).map('R$ {:.2f}'.format).str.replace('.', ',', regex=False)
+    tabela_carteira_automatizada['Rentabilidade'] = df_auxiliar['Rentabilidade'].round(2).map('{:.2f} %'.format).str.replace('.', ',', regex=False)
+
+    return formatar_numero(total_de_ativos_carteira_automatizada),"R$ "+formatar_numero(renda_por_ativo_carteira_automatizada), "R$ "+formatar_numero(receita_total_carteira_automatizada), "R$ "+formatar_numero(comissao_carteira_automatizada), tabela_carteira_automatizada.to_dict('records')
 
 @callback(
     Output("total_de_ativos_renda_fixa", "children"),
